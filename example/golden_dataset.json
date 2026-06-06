@@ -1,0 +1,52 @@
+[
+  {
+    "query": "How do I authenticate API requests in EvalCI?",
+    "context": "EvalCI uses API key authentication for all requests. You must include the header 'Authorization: Bearer <your-api-key>' in every request. API keys can be generated from the Settings page under 'API Access'. Keys expire after 90 days and can be rotated without downtime using the key rotation endpoint.",
+    "expected_answer": "Authenticate API requests by including the header 'Authorization: Bearer <your-api-key>'. Generate API keys from the Settings page under 'API Access'. Keys expire after 90 days and support rotation without downtime."
+  },
+  {
+    "query": "What is the maximum number of samples in a golden dataset?",
+    "context": "Golden datasets in EvalCI are JSON arrays of evaluation samples. Each sample requires 'query', 'context', and 'expected_answer' fields. There is no hard limit on dataset size, but datasets larger than 10,000 samples may cause the evaluation to exceed the default 2-hour CI timeout. For large datasets, consider using the batch evaluation mode.",
+    "expected_answer": "There is no hard limit on golden dataset size. However, datasets larger than 10,000 samples may exceed the default 2-hour CI timeout. Use batch evaluation mode for large datasets."
+  },
+  {
+    "query": "Which Ollama models are supported as judges?",
+    "context": "EvalCI supports any model available through the Ollama runtime as a judge. The default and recommended model is 'mistral' due to its strong instruction-following capabilities. Other tested models include 'llama3', 'phi3', and 'gemma2'. Larger models generally produce more accurate evaluations but increase evaluation time. The model is configured via the 'judge_model' field in evalci.yaml.",
+    "expected_answer": "EvalCI supports any Ollama-compatible model as a judge. The default is 'mistral'. Other tested options include llama3, phi3, and gemma2. Configure the model via 'judge_model' in evalci.yaml."
+  },
+  {
+    "query": "How does the faithfulness metric work?",
+    "context": "The faithfulness metric uses a two-step evaluation process. First, the judge LLM decomposes the generated answer into a list of atomic, verifiable claims. Second, each claim is individually checked against the provided context to determine if it is supported. The faithfulness score is calculated as the ratio of supported claims to total claims. A score of 1.0 means every claim in the answer is grounded in the context.",
+    "expected_answer": "The faithfulness metric works in two steps: first it decomposes the answer into atomic claims, then verifies each claim against the context. The score equals the fraction of supported claims. A score of 1.0 means all claims are grounded in the context."
+  },
+  {
+    "query": "Can EvalCI integrate with Jenkins or GitLab CI?",
+    "context": "EvalCI is CI-system agnostic. While it ships with a GitHub Actions workflow out of the box, the core evaluation logic runs as a Python CLI tool. You can integrate EvalCI into Jenkins, GitLab CI, CircleCI, or any other CI system by calling 'evalci run' from a shell step. The CLI exits with code 0 on success and code 1 on regression, which is the standard convention for CI pass/fail signals.",
+    "expected_answer": "Yes, EvalCI integrates with any CI system including Jenkins and GitLab CI. Run 'evalci run' from a shell step. It exits 0 on success and 1 on regression, following standard CI conventions."
+  },
+  {
+    "query": "What is the allowed_delta regression setting?",
+    "context": "The 'allowed_delta' setting under the 'regression' block in evalci.yaml defines how much a metric score can drop from its baseline before triggering a regression failure. For example, if allowed_delta is 0.05 and the baseline faithfulness score was 0.85, the score must remain above 0.80 to pass. This setting prevents false positives from small, non-meaningful fluctuations in LLM judge scoring.",
+    "expected_answer": "The 'allowed_delta' setting defines the maximum acceptable score drop from baseline. With allowed_delta of 0.05, a baseline of 0.85 allows the score to drop to 0.80 before failing. This prevents false positives from small score fluctuations."
+  },
+  {
+    "query": "What happens if Ollama is not running when the CI job starts?",
+    "context": "EvalCI performs a health check against the Ollama endpoint before starting evaluation. If the health check fails after 30 retry attempts (spaced 5 seconds apart), the evaluation job exits with an error. In the GitHub Actions workflow, the Ollama service is started as a Docker container and the workflow includes a wait loop that polls the /api/tags endpoint before proceeding.",
+    "expected_answer": "EvalCI performs a health check and retries 30 times before failing. In GitHub Actions, the workflow starts Ollama as a Docker container and polls /api/tags until it responds before beginning evaluation."
+  },
+  {
+    "query": "How do I configure different thresholds for different metrics?",
+    "context": "Metric thresholds are configured per-metric in the 'thresholds' section of evalci.yaml. Each key is a metric name and the value is the minimum passing score between 0.0 and 1.0. For example: 'answer_relevance: 0.70' means that the average answer relevance score across all samples must be at least 0.70 to pass. Thresholds can also be updated live via the dashboard's Threshold Editor component without restarting the server.",
+    "expected_answer": "Configure thresholds per metric in the 'thresholds' section of evalci.yaml, using metric names as keys and minimum scores as values (e.g., 'answer_relevance: 0.70'). Thresholds can also be updated live via the dashboard."
+  },
+  {
+    "query": "What cloud services does EvalCI require?",
+    "context": "EvalCI is designed to be fully self-hosted with zero cloud dependencies. It uses Ollama for local LLM inference, SQLite for storage, and all compute runs on your own hardware or CI runner. There are no API keys required, no usage fees, and no data leaves your environment. The only external dependency is pulling the Ollama model weights on first run, which are cached locally afterward.",
+    "expected_answer": "EvalCI requires no cloud services. It runs fully locally using Ollama for inference and SQLite for storage. No API keys, no fees, and no data leaves your environment. Model weights are cached after the initial download."
+  },
+  {
+    "query": "How do I add a new custom metric to EvalCI?",
+    "context": "To add a custom metric, create a new Python class that inherits from BaseMetric in backend/metrics/base.py. Implement the async 'score' method which accepts query, context, expected, and actual as string arguments and returns a MetricResult. Register the new metric in the METRIC_REGISTRY dictionary in backend/metrics/__init__.py using a unique string key. Then add the metric key to the 'enabled_metrics' list in evalci.yaml.",
+    "expected_answer": "To add a custom metric: 1) Subclass BaseMetric and implement the async score() method, 2) Register it in METRIC_REGISTRY in backend/metrics/__init__.py, 3) Add the metric key to 'enabled_metrics' in evalci.yaml."
+  }
+]

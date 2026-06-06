@@ -1,0 +1,18 @@
+ollama_url: http://localhost:11434
+judge_model: mistral
+dataset_path: example/golden_dataset.json
+prompt_dirs:
+  - example/prompts
+enabled_metrics:
+  - answer_relevance
+  - faithfulness
+  - semantic_similarity
+thresholds:
+  answer_relevance: 0.70
+  faithfulness: 0.75
+  semantic_similarity: 0.65
+regression:
+  allowed_delta: 0.05
+  block_on_regression: true
+max_concurrent_evals: 5
+judge_timeout_seconds: 25

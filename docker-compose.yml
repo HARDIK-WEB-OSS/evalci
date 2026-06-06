@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  evalci-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    container_name: evalci-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - EVALCI_OLLAMA_URL=http://ollama:11434
+      - EVALCI_CONFIG_PATH=/app/evalci.yaml
+      - EVALCI_DB_URL=sqlite+aiosqlite:////data/evalci.db
+    volumes:
+      - evalci-data:/data
+      - ./evalci.yaml:/app/evalci.yaml:ro
+      - ./example:/app/example:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  evalci-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: evalci-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      evalci-backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: evalci-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    entrypoint: >
+      sh -c "ollama serve &
+             sleep 5 &&
+             ollama pull mistral &&
+             wait"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  evalci-data:
+    driver: local
+  ollama-models:
+    driver: local

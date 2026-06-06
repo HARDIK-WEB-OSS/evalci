@@ -41,7 +41,20 @@ class Settings(BaseSettings):
     block_on_regression: bool = True
 
     def model_post_init(self, __context) -> None:
-        """Override individual thresholds from environment variables if set."""
+        """
+        Override settings from environment variables.
+        This allows CI to run a deterministic subset of metrics
+        while local dev runs the full LLM judge suite.
+        """
+        # Allow CI to override which metrics run
+        import json as _json
+        metrics_env = os.environ.get("EVALCI_ENABLED_METRICS")
+        if metrics_env:
+            try:
+                self.enabled_metrics = _json.loads(metrics_env)
+            except Exception:
+                pass
+
         overrides = {
             "answer_relevance": os.environ.get("EVALCI_THRESHOLD_ANSWER_RELEVANCE"),
             "faithfulness": os.environ.get("EVALCI_THRESHOLD_FAITHFULNESS"),

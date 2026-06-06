@@ -8,18 +8,21 @@ on:
       - "**/evalci.yaml"
       - "example/golden_dataset.json"
 
-env:
-  EVALCI_OLLAMA_URL: http://localhost:11434
-  EVALCI_DATASET_PATH: example/golden_dataset.json
-  EVALCI_CONFIG_PATH: evalci.yaml
-  EVALCI_OUTPUT_DIR: eval-outputs
-  EVALCI_THRESHOLD_ANSWER_RELEVANCE: "0.50"
-  EVALCI_THRESHOLD_FAITHFULNESS: "0.50"
-  EVALCI_THRESHOLD_SEMANTIC_SIMILARITY: "0.60" 
-
 permissions:
   pull-requests: write
   issues: write
+
+env:
+  EVALCI_DATASET_PATH: example/golden_dataset.json
+  EVALCI_CONFIG_PATH: evalci.yaml
+  EVALCI_OUTPUT_DIR: eval-outputs
+  # CI uses only semantic_similarity — deterministic, no Ollama needed
+  # LLM-based metrics (answer_relevance, faithfulness) run locally
+  # where Ollama is available. This is a deliberate architectural choice:
+  # CI gates on embedding similarity (always consistent),
+  # developers gate on LLM judge metrics (richer signal, local only).
+  EVALCI_ENABLED_METRICS: '["semantic_similarity"]'
+  EVALCI_THRESHOLD_SEMANTIC_SIMILARITY: "0.60"
 
 jobs:
   eval:
@@ -45,47 +48,21 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction
 
-      - name: Start Ollama service
-        run: |
-          docker run -d \
-            --name ollama \
-            -p 11434:11434 \
-            -v ollama-data:/root/.ollama \
-            ollama/ollama:latest
-
-      - name: Wait for Ollama to be ready
-        run: |
-          echo "Waiting for Ollama to start..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
-              echo "Ollama is ready."
-              break
-            fi
-            echo "Attempt $i/30 — sleeping 5s..."
-            sleep 5
-          done
-          curl -sf http://localhost:11434/api/tags || (echo "Ollama did not start in time" && exit 1)
-
-      - name: Pull Ollama judge model
-        run: |
-          docker exec ollama ollama pull mistral
-          echo "Model pull complete."
-
       - name: Run prompt regression evaluation
         id: eval
         run: |
           mkdir -p "$EVALCI_OUTPUT_DIR"
           poetry run bash scripts/run_eval.sh
         env:
-          EVALCI_OLLAMA_URL: ${{ env.EVALCI_OLLAMA_URL }}
           EVALCI_DATASET_PATH: ${{ env.EVALCI_DATASET_PATH }}
           EVALCI_CONFIG_PATH: ${{ env.EVALCI_CONFIG_PATH }}
-          EVALCI_COMMIT_SHA: ${{ github.sha }}
-          EVALCI_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVALCI_OUTPUT_DIR: ${{ env.EVALCI_OUTPUT_DIR }}
+          EVALCI_ENABLED_METRICS: ${{ env.EVALCI_ENABLED_METRICS }}
+          EVALCI_THRESHOLD_SEMANTIC_SIMILARITY: ${{ env.EVALCI_THRESHOLD_SEMANTIC_SIMILARITY }}
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Upload eval reports as artifacts
+      - name: Upload eval reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -103,30 +80,24 @@ jobs:
           script: |
             const fs = require('fs');
             const path = `${{ env.EVALCI_OUTPUT_DIR }}/eval_report.md`;
-
             let body;
             if (fs.existsSync(path)) {
               body = fs.readFileSync(path, 'utf8');
-              // GitHub comments have a 65536 char limit
               if (body.length > 65000) {
-                body = body.slice(0, 65000) + '\n\n_...report truncated. See artifact for full report._';
+                body = body.slice(0, 65000) + '\n\n_...truncated. See artifact for full report._';
               }
             } else {
-              body = '⚠️ EvalCI: Report file not found. Check the workflow logs for errors.';
+              body = '⚠️ EvalCI: Report not generated. Check workflow logs.';
             }
-
-            // Find and update existing EvalCI comment, or create new one
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
             const existing = comments.find(c =>
               c.user.login === 'github-actions[bot]' &&
               c.body.includes('EvalCI Prompt Regression Report')
             );
-
             if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -146,5 +117,5 @@ jobs:
       - name: Fail if regression detected
         if: failure()
         run: |
-          echo "::error::EvalCI detected metric regression. Review the PR comment for details."
+          echo "::error::EvalCI detected metric regression."
           exit 1

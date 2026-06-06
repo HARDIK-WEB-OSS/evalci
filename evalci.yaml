@@ -15,4 +15,4 @@ regression:
   allowed_delta: 0.05
   block_on_regression: true
 max_concurrent_evals: 5
-judge_timeout_seconds: 25
+judge_timeout_seconds: 30

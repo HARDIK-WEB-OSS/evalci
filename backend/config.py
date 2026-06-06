@@ -40,6 +40,20 @@ class Settings(BaseSettings):
     regression_allowed_delta: float = 0.05
     block_on_regression: bool = True
 
+    def model_post_init(self, __context) -> None:
+        """Override individual thresholds from environment variables if set."""
+        overrides = {
+            "answer_relevance": os.environ.get("EVALCI_THRESHOLD_ANSWER_RELEVANCE"),
+            "faithfulness": os.environ.get("EVALCI_THRESHOLD_FAITHFULNESS"),
+            "semantic_similarity": os.environ.get("EVALCI_THRESHOLD_SEMANTIC_SIMILARITY"),
+        }
+        for key, val in overrides.items():
+            if val is not None:
+                try:
+                    self.thresholds[key] = float(val)
+                except ValueError:
+                    pass
+
     @classmethod
     def from_yaml(cls, path: Optional[str] = None) -> "Settings":
         config_path = path or os.environ.get("EVALCI_CONFIG_PATH", "evalci.yaml")

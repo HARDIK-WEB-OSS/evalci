@@ -13,6 +13,9 @@ env:
   EVALCI_DATASET_PATH: example/golden_dataset.json
   EVALCI_CONFIG_PATH: evalci.yaml
   EVALCI_OUTPUT_DIR: eval-outputs
+  EVALCI_THRESHOLD_ANSWER_RELEVANCE: "0.50"
+  EVALCI_THRESHOLD_FAITHFULNESS: "0.50"
+  EVALCI_THRESHOLD_SEMANTIC_SIMILARITY: "0.60" 
 
 permissions:
   pull-requests: write

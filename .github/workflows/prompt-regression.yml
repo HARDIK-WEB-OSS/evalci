@@ -14,6 +14,10 @@ env:
   EVALCI_CONFIG_PATH: evalci.yaml
   EVALCI_OUTPUT_DIR: eval-outputs
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   eval:
     name: Evaluate Prompt Changes

@@ -6,7 +6,7 @@ import logging
 import re
 import time
 
-from backend.judge import AsyncJudgeClient
+from backend.judge import OllamaJudge as AsyncJudgeClient
 from backend.metrics.base import BaseMetric, MetricResult
 
 logger = logging.getLogger(__name__)

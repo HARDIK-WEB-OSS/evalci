@@ -7,7 +7,7 @@ import re
 import time
 from typing import Optional
 
-from backend.judge import OllamaJudge
+from backend.judge import AsyncJudgeClient
 from backend.metrics.base import BaseMetric, MetricResult
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ class FaithfulnessMetric(BaseMetric):
         "Uses a two-step approach: decompose into claims, then verify each claim."
     )
 
-    def __init__(self, judge: OllamaJudge, threshold: float = 0.75) -> None:
+    def __init__(self, judge: AsyncJudgeClient, threshold: float = 0.75) -> None:
         super().__init__(threshold=threshold)
         self.judge = judge
 

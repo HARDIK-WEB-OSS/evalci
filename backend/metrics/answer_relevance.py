@@ -6,7 +6,7 @@ import logging
 import re
 import time
 
-from backend.judge import OllamaJudge
+from backend.judge import AsyncJudgeClient
 from backend.metrics.base import BaseMetric, MetricResult
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ class AnswerRelevanceMetric(BaseMetric):
     name = "answer_relevance"
     description = "Measures how relevant the generated answer is to the input query."
 
-    def __init__(self, judge: OllamaJudge, threshold: float = 0.70) -> None:
+    def __init__(self, judge: AsyncJudgeClient, threshold: float = 0.70) -> None:
         super().__init__(threshold=threshold)
         self.judge = judge
 

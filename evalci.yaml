@@ -1,5 +1,5 @@
 ollama_url: http://localhost:11434
-judge_model: tinyllama
+judge_model: mistral
 dataset_path: example/golden_dataset.json
 prompt_dirs:
   - example/prompts

@@ -61,7 +61,7 @@ jobs:
 
       - name: Pull Ollama judge model
         run: |
-          docker exec ollama ollama pull tinyllama
+          docker exec ollama ollama pull mistral
           echo "Model pull complete."
 
       - name: Run prompt regression evaluation

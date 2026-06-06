@@ -11,7 +11,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import Settings
-from backend.judge import OllamaJudge
+from backend.judge import AsyncJudgeClient
 from backend.metrics import METRIC_REGISTRY
 from backend.metrics.base import BaseMetric, MetricResult
 from backend.models import EvalRun, MetricScore, RunStatus, SampleResult
@@ -65,12 +65,17 @@ def _render_prompt(template: str, query: str, context: str) -> str:
 
 async def _mock_pipeline(prompt: str) -> str:
     """
-    Mock LLM pipeline used when no external pipeline URL is configured.
-    In real usage this would call your production LLM endpoint.
-    Returns the last non-empty line of the prompt as a stand-in answer.
+    Calls local Ollama to generate an actual answer from the prompt template.
+    Used when no external pipeline URL is configured.
     """
-    lines = [l.strip() for l in prompt.splitlines() if l.strip()]
-    return lines[-1] if lines else "No answer generated."
+    from backend.judge import AsyncJudgeClient
+    client = AsyncJudgeClient()
+    try:
+        response = await client.judge(prompt)
+        return response.strip() if response else "No answer generated."
+    except Exception as exc:
+        logger.error("Mock pipeline Ollama call failed: %s", exc)
+        return f"[Pipeline error: {exc}]"
 
 
 class EvalRunner:
@@ -83,7 +88,7 @@ class EvalRunner:
         self.settings = settings
         self.session = session
         self.pipeline_url = pipeline_url
-        self.judge = OllamaJudge(
+        self.judge = AsyncJudgeClient(
             base_url=settings.ollama_url,
             model=settings.judge_model,
             timeout=settings.judge_timeout_seconds,

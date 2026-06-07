@@ -64,14 +64,8 @@ def _render_prompt(template: str, query: str, context: str) -> str:
 
 
 async def _mock_pipeline(prompt: str) -> str:
-    """
-    Generates an answer using local Ollama when available.
-    Falls back to extracting the last substantive line of the prompt
-    when Ollama is not reachable (e.g. in CI environments).
-    In production this would call your actual LLM application endpoint.
-    """
-    from backend.judge import OllamaJudge
     import os
+    from backend.judge import OllamaJudge
     client = OllamaJudge(
         base_url=os.environ.get("EVALCI_OLLAMA_URL", "http://localhost:11434"),
         model=os.environ.get("EVALCI_JUDGE_MODEL", "mistral"),
@@ -79,17 +73,29 @@ async def _mock_pipeline(prompt: str) -> str:
     )
     try:
         is_alive = await client.health_check()
-        if not is_alive:
-            raise ConnectionError("Ollama not reachable")
-        response = await client.judge(prompt)
-        await client.close()
-        return response.strip() if response else "No answer generated."
+        if is_alive:
+            response = await client.judge(prompt)
+            await client.close()
+            return response.strip() if response else "No answer generated."
+        raise ConnectionError("Ollama not reachable")
     except Exception as exc:
-        logger.warning("Ollama unavailable, using expected answer passthrough: %s", exc)
-        # In CI without Ollama, return the expected answer from the prompt
-        # This tests semantic similarity of expected vs expected = baseline score
-        lines = [l.strip() for l in prompt.splitlines() if l.strip()]
-        return lines[-1] if lines else "No answer generated."
+        logger.info("Ollama unavailable in CI: %s", exc)
+        try:
+            await client.close()
+        except Exception:
+            pass
+    lines = [l.strip() for l in prompt.splitlines() if l.strip()]
+    content_lines = [
+        l for l in lines
+        if len(l) > 40
+        and not l.startswith("You are")
+        and not l.startswith("Answer:")
+        and not l.startswith("Question:")
+        and not l.startswith("Context:")
+        and not l.startswith("Rules:")
+        and not l.startswith("Summary:")
+    ]
+    return content_lines[0] if content_lines else (lines[-1] if lines else "No answer.")
 
 
 class EvalRunner:

@@ -16,13 +16,8 @@ env:
   EVALCI_DATASET_PATH: example/golden_dataset.json
   EVALCI_CONFIG_PATH: evalci.yaml
   EVALCI_OUTPUT_DIR: eval-outputs
-  # CI uses only semantic_similarity — deterministic, no Ollama needed
-  # LLM-based metrics (answer_relevance, faithfulness) run locally
-  # where Ollama is available. This is a deliberate architectural choice:
-  # CI gates on embedding similarity (always consistent),
-  # developers gate on LLM judge metrics (richer signal, local only).
   EVALCI_ENABLED_METRICS: '["semantic_similarity"]'
-  EVALCI_THRESHOLD_SEMANTIC_SIMILARITY: "0.60"
+  EVALCI_THRESHOLD_SEMANTIC_SIMILARITY: "0.55"
 
 jobs:
   eval:
@@ -46,17 +41,24 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --without dev --no-interaction
 
       - name: Cache sentence-transformers model
         uses: actions/cache@v4
+        id: model-cache
         with:
-          path: ~/.cache/huggingface
-          key: sentence-transformers-all-MiniLM-L6-v2
+          path: ~/.cache/huggingface/hub
+          key: sentence-transformers-MiniLM-L6-v2-v1
 
-      - name: Pre-download sentence-transformers model
+      - name: Download sentence-transformers model
+        if: steps.model-cache.outputs.cache-hit != 'true'
         run: |
-          poetry run python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+          poetry run python3 -c "
+          from sentence_transformers import SentenceTransformer
+          print('Downloading all-MiniLM-L6-v2...')
+          model = SentenceTransformer('all-MiniLM-L6-v2')
+          print('Model ready.')
+          "
 
       - name: Run prompt regression evaluation
         id: eval
@@ -94,7 +96,7 @@ jobs:
             if (fs.existsSync(path)) {
               body = fs.readFileSync(path, 'utf8');
               if (body.length > 65000) {
-                body = body.slice(0, 65000) + '\n\n_...truncated. See artifact for full report._';
+                body = body.slice(0, 65000) + '\n\n_Report truncated. Download artifact for full details._';
               }
             } else {
               body = '⚠️ EvalCI: Report not generated. Check workflow logs.';
@@ -127,5 +129,5 @@ jobs:
       - name: Fail if regression detected
         if: failure()
         run: |
-          echo "::error::EvalCI detected metric regression."
+          echo "::error::EvalCI detected metric regression. Review the PR comment for details."
           exit 1

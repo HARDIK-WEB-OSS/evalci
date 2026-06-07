@@ -64,7 +64,7 @@ def _render_prompt(template: str, query: str, context: str) -> str:
 
 
 async def _mock_pipeline(prompt: str) -> str:
-    import os
+    import os, re as _re
     from backend.judge import OllamaJudge
     client = OllamaJudge(
         base_url=os.environ.get("EVALCI_OLLAMA_URL", "http://localhost:11434"),
@@ -84,18 +84,21 @@ async def _mock_pipeline(prompt: str) -> str:
             await client.close()
         except Exception:
             pass
+    # Extract Context block from rendered prompt as proxy answer for CI
+    idx_ctx = prompt.find("Context:")
+    idx_q = prompt.find("Question:")
+    idx_a = prompt.find("Answer:")
+    if idx_ctx != -1:
+        end_idx = min(
+            x for x in [idx_q, idx_a, len(prompt)]
+            if x > idx_ctx
+        )
+        ctx_block = prompt[idx_ctx + len("Context:"):end_idx].strip()
+        if ctx_block:
+            return ctx_block
     lines = [l.strip() for l in prompt.splitlines() if l.strip()]
-    content_lines = [
-        l for l in lines
-        if len(l) > 40
-        and not l.startswith("You are")
-        and not l.startswith("Answer:")
-        and not l.startswith("Question:")
-        and not l.startswith("Context:")
-        and not l.startswith("Rules:")
-        and not l.startswith("Summary:")
-    ]
-    return content_lines[0] if content_lines else (lines[-1] if lines else "No answer.")
+    return max(lines, key=len) if lines else "No answer available."
+
 
 
 class EvalRunner:
